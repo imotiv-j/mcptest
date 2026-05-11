@@ -3,37 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCP Test - Secure File Upload</title>
+    <title>MCP Test - Secure Upload</title>
     <style>
         body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; background: #f8f9fa; }
         .container { max-width: 900px; margin: 0 auto; background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
         h1 { text-align: center; }
-        .upload-area { border: 3px dashed #667eea; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0; cursor: pointer; }
-        .upload-area:hover { background: #f0f4ff; }
-        button { padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .login-box, .upload-area { border: 3px dashed #667eea; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0; }
+        button { padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1.1rem; }
         .file-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        #status { margin: 1rem 0; font-weight: bold; }
+        #status { margin: 1rem 0; font-weight: bold; color: #333; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📤 Secure File Upload</h1>
-        
-        <div class="upload-area" id="drop-area">
-            <h3>Drop file here or click to upload</h3>
-            <input type="file" id="fileInput" hidden>
-            <button onclick="document.getElementById('fileInput').click()">Select File</button>
+        <div class="header">
+            <h1>📤 Secure File Upload</h1>
+            <div id="user-info"></div>
         </div>
 
-        <button onclick="loadFiles()">🔄 Refresh Files</button>
-        <div id="status"></div>
-        
-        <h2>Uploaded Files</h2>
-        <div id="files-list">Loading...</div>
+        <div id="login-section" class="login-box">
+            <h2>Welcome</h2>
+            <button onclick="loginWithGitHub()">Sign in with GitHub</button>
+        </div>
+
+        <div id="main-app" style="display: none;">
+            <div class="upload-area" id="drop-area">
+                <h3>Drop file here or click to upload</h3>
+                <input type="file" id="fileInput" hidden>
+                <button onclick="document.getElementById('fileInput').click()">Select File</button>
+            </div>
+
+            <button onclick="loadFiles()">🔄 Refresh Files</button>
+            <button onclick="logout()">Logout</button>
+            <div id="status"></div>
+            
+            <h2>Your Files</h2>
+            <div id="files-list">Loading your files...</div>
+        </div>
     </div>
 
     <script>
-        const API_BASE = '/api';   // ← Relative path (this fixes Codespaces)
+        async function checkLogin() {
+            const res = await fetch('/api/user');
+            if (res.ok) {
+                const user = await res.json();
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('main-app').style.display = 'block';
+                document.getElementById('user-info').innerHTML = `Logged in as <strong>@${user.login}</strong>`;
+                loadFiles();
+            }
+        }
+
+        function loginWithGitHub() {
+            window.location.href = '/auth/github';
+        }
+
+        function logout() {
+            window.location.href = '/api/logout';
+        }
 
         async function uploadFile(file) {
             const status = document.getElementById('status');
@@ -42,19 +70,20 @@
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const content = btoa(unescape(encodeURIComponent(e.target.result)));
-                const path = `uploads/${Date.now()}-${file.name}`;
+                const username = 'PLACEHOLDER'; // will be replaced by session
+                const path = `uploads/${username}/${Date.now()}-${file.name}`;
 
-                const res = await fetch(`${API_BASE}/upload`, {
+                const res = await fetch('/api/upload', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path, content, message: `Upload ${file.name}` })
+                    body: JSON.stringify({ path, content })
                 });
 
                 if (res.ok) {
                     status.innerHTML = `✅ Uploaded: <strong>${file.name}</strong>`;
                     loadFiles();
                 } else {
-                    status.textContent = "❌ Upload failed";
+                    status.textContent = '❌ Upload failed';
                 }
             };
             reader.readAsText(file);
@@ -62,28 +91,20 @@
 
         async function loadFiles() {
             const listEl = document.getElementById('files-list');
-            listEl.innerHTML = "Loading files...";
+            listEl.innerHTML = 'Loading...';
 
             try {
-                const res = await fetch(`${API_BASE}/files`);
-                if (!res.ok) throw new Error("Failed to load");
-                
+                const res = await fetch('/api/files');
                 const files = await res.json();
-                
+
                 let html = '';
-                if (Array.isArray(files)) {
-                    files.forEach(file => {
-                        const rawUrl = `https://raw.githubusercontent.com/imotiv-j/mcptest/main/${file.path}`;
-                        html += `
-                            <div class="file-item">
-                                <span>📄 ${file.name}</span>
-                                <a href="${rawUrl}" target="_blank">View Raw</a>
-                            </div>`;
-                    });
-                }
-                listEl.innerHTML = html || "<p>No files uploaded yet.</p>";
+                files.forEach(file => {
+                    const rawUrl = `https://raw.githubusercontent.com/imotiv-j/mcptest/main/${file.path}`;
+                    html += `<div class="file-item"><span>📄 ${file.name}</span><a href="${rawUrl}" target="_blank">View</a></div>`;
+                });
+                listEl.innerHTML = html || '<p>No files yet.</p>';
             } catch (err) {
-                listEl.innerHTML = "❌ Cannot connect to backend. Make sure server is running.";
+                listEl.innerHTML = 'Error loading files.';
             }
         }
 
@@ -101,7 +122,7 @@
             if (e.target.files.length) uploadFile(e.target.files[0]);
         });
 
-        window.onload = loadFiles;
+        window.onload = checkLogin;
     </script>
 </body>
 </html>
