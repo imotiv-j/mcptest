@@ -5,150 +5,100 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MCP Test - Secure File Upload</title>
     <style>
-        body {
-            font-family: system-ui, sans-serif;
-            margin: 0;
-            padding: 2rem;
-            background: #f8f9fa;
-        }
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            background: white;
-            padding: 2rem;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        }
-        h1 { text-align: center; color: #333; }
-        .upload-area {
-            border: 3px dashed #667eea;
-            border-radius: 12px;
-            padding: 40px;
-            text-align: center;
-            margin: 2rem 0;
-            cursor: pointer;
-        }
+        body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; background: #f8f9fa; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        h1 { text-align: center; }
+        .upload-area { border: 3px dashed #667eea; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0; cursor: pointer; }
         .upload-area:hover { background: #f0f4ff; }
-        button {
-            padding: 12px 24px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            margin: 5px;
-        }
-        #files-list {
-            margin-top: 2rem;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .file-item {
-            padding: 12px;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .status { margin: 1rem 0; font-weight: bold; padding: 10px; border-radius: 8px; }
+        button { padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .file-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        #status { margin: 1rem 0; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📤 Secure File Upload & Viewer</h1>
+        <h1>📤 Secure File Upload</h1>
         
         <div class="upload-area" id="drop-area">
-            <h3>Drop files here or click to upload</h3>
+            <h3>Drop file here or click to upload</h3>
             <input type="file" id="fileInput" hidden>
             <button onclick="document.getElementById('fileInput').click()">Select File</button>
         </div>
 
-        <button onclick="loadFiles()">🔄 Refresh File List</button>
-
-        <div id="status" class="status"></div>
+        <button onclick="loadFiles()">🔄 Refresh Files</button>
+        <div id="status"></div>
         
-        <h2>📁 Uploaded Files</h2>
-        <div id="files-list">Loading files...</div>
+        <h2>Uploaded Files</h2>
+        <div id="files-list">Loading...</div>
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:3000/api';
+        const API_BASE = '/api';   // ← Relative path (this fixes Codespaces)
 
-        // Upload File
         async function uploadFile(file) {
             const status = document.getElementById('status');
             status.textContent = `Uploading ${file.name}...`;
-            status.style.background = '#fff3cd';
 
-            try {
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    const content = btoa(unescape(encodeURIComponent(e.target.result)));
-                    const path = `uploads/${Date.now()}-${file.name}`;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const content = btoa(unescape(encodeURIComponent(e.target.result)));
+                const path = `uploads/${Date.now()}-${file.name}`;
 
-                    const res = await fetch(`${API_BASE}/upload`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ path, content, message: `Upload ${file.name}` })
-                    });
+                const res = await fetch(`${API_BASE}/upload`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path, content, message: `Upload ${file.name}` })
+                });
 
-                    if (res.ok) {
-                        status.innerHTML = `✅ Successfully uploaded: <strong>${file.name}</strong>`;
-                        status.style.background = '#d4edda';
-                        loadFiles();
-                    } else {
-                        status.textContent = '❌ Upload failed';
-                        status.style.background = '#f8d7da';
-                    }
-                };
-                reader.readAsText(file);
-            } catch (err) {
-                status.textContent = '❌ Error: ' + err.message;
-            }
+                if (res.ok) {
+                    status.innerHTML = `✅ Uploaded: <strong>${file.name}</strong>`;
+                    loadFiles();
+                } else {
+                    status.textContent = "❌ Upload failed";
+                }
+            };
+            reader.readAsText(file);
         }
 
         async function loadFiles() {
             const listEl = document.getElementById('files-list');
-            listEl.innerHTML = 'Loading files...';
+            listEl.innerHTML = "Loading files...";
 
             try {
                 const res = await fetch(`${API_BASE}/files`);
+                if (!res.ok) throw new Error("Failed to load");
+                
                 const files = await res.json();
                 
-                if (!Array.isArray(files) || files.length === 0) {
-                    listEl.innerHTML = '<p>No files uploaded yet.</p>';
-                    return;
-                }
-
                 let html = '';
-                files.forEach(file => {
-                    if (file.type === 'file') {
+                if (Array.isArray(files)) {
+                    files.forEach(file => {
                         const rawUrl = `https://raw.githubusercontent.com/imotiv-j/mcptest/main/${file.path}`;
                         html += `
                             <div class="file-item">
                                 <span>📄 ${file.name}</span>
-                                <a href="${rawUrl}" target="_blank" style="color: #667eea;">View Raw →</a>
+                                <a href="${rawUrl}" target="_blank">View Raw</a>
                             </div>`;
-                    }
-                });
-                listEl.innerHTML = html;
+                    });
+                }
+                listEl.innerHTML = html || "<p>No files uploaded yet.</p>";
             } catch (err) {
-                listEl.innerHTML = '<p style="color: red;">Cannot connect to backend server.<br>Make sure backend is running.</p>';
+                listEl.innerHTML = "❌ Cannot connect to backend. Make sure server is running.";
             }
         }
 
-        // Event listeners
-        document.getElementById('fileInput').addEventListener('change', (e) => {
-            if (e.target.files.length > 0) uploadFile(e.target.files[0]);
-        });
-
+        // Drag & Drop
         const dropArea = document.getElementById('drop-area');
         dropArea.addEventListener('dragover', e => { e.preventDefault(); dropArea.style.background = '#f0f4ff'; });
         dropArea.addEventListener('dragleave', () => dropArea.style.background = '');
         dropArea.addEventListener('drop', e => {
             e.preventDefault();
             dropArea.style.background = '';
-            if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
+            if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]);
+        });
+
+        document.getElementById('fileInput').addEventListener('change', e => {
+            if (e.target.files.length) uploadFile(e.target.files[0]);
         });
 
         window.onload = loadFiles;
