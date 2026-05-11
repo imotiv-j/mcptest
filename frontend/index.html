@@ -3,49 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello World - MCP Test</title>
+    <title>MCP Test - File Upload</title>
     <style>
         body {
-            font-family: system-ui, -apple-system, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            font-family: system-ui, sans-serif;
             margin: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            padding: 2rem;
+            background: #f8f9fa;
         }
         .container {
-            text-align: center;
-            padding: 3rem;
-            background: rgba(255,255,255,0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-        }
-        h1 { font-size: 3.5rem; margin: 0 0 1rem 0; }
-        p { font-size: 1.2rem; opacity: 0.9; }
-        button {
-            margin-top: 2rem;
-            padding: 12px 32px;
-            font-size: 1.1rem;
+            max-width: 800px;
+            margin: 0 auto;
             background: white;
-            color: #333;
-            border: none;
-            border-radius: 50px;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        h1 { text-align: center; color: #333; }
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            margin: 2rem 0;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: all 0.3s;
         }
-        button:hover {
-            transform: scale(1.05);
+        .upload-area:hover {
+            background: #f0f4ff;
         }
+        button {
+            padding: 12px 24px;
+            font-size: 1.1rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        #status { margin-top: 1rem; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Hello World! 👋</h1>
-        <p>Basic frontend ready for Codespaces testing in imotiv-j/mcptest.</p>
-        <button onclick="alert('Hello from your MCP test frontend! 🚀')">Click me!</button>
+        <h1>📤 File Upload to Repository</h1>
+        
+        <div class="upload-area" id="drop-area">
+            <h3>Drop file here or click to upload</h3>
+            <input type="file" id="fileInput" hidden>
+            <button onclick="document.getElementById('fileInput').click()">Select File</button>
+        </div>
+
+        <div id="status"></div>
     </div>
+
+    <script>
+        const GITHUB_TOKEN = "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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"; // ← Change this
+        const REPO_OWNER = "imotiv-j";
+        const REPO_NAME = "mcptest";
+
+        async function uploadFile(file) {
+            const status = document.getElementById('status');
+            status.textContent = "Uploading...";
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const content = btoa(unescape(encodeURIComponent(e.target.result))); // base64
+
+                const path = `uploads/${Date.now()}-${file.name}`;
+
+                const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${GITHUB_TOKEN}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: `Upload ${file.name}`,
+                        content: content,
+                        branch: "main"
+                    })
+                });
+
+                if (response.ok) {
+                    status.innerHTML = `✅ File uploaded successfully!<br><strong>${file.name}</strong>`;
+                } else {
+                    status.textContent = "❌ Upload failed. Check your token and repo permissions.";
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Event Listeners
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            if (e.target.files.length > 0) uploadFile(e.target.files[0]);
+        });
+
+        // Drag & Drop support
+        const dropArea = document.getElementById('drop-area');
+        dropArea.addEventListener('dragover', e => { e.preventDefault(); dropArea.style.background = '#f0f4ff'; });
+        dropArea.addEventListener('dragleave', () => dropArea.style.background = '');
+        dropArea.addEventListener('drop', e => {
+            e.preventDefault();
+            dropArea.style.background = '';
+            if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
+        });
+    </script>
 </body>
 </html>
