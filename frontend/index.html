@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCP Test - File Upload & Viewer</title>
+    <title>MCP Test - Secure File Upload</title>
     <style>
         body {
             font-family: system-ui, sans-serif;
@@ -44,17 +44,18 @@
             overflow-y: auto;
         }
         .file-item {
-            padding: 10px;
+            padding: 12px;
             border-bottom: 1px solid #eee;
             display: flex;
             justify-content: space-between;
+            align-items: center;
         }
-        .status { margin: 1rem 0; font-weight: bold; }
+        .status { margin: 1rem 0; font-weight: bold; padding: 10px; border-radius: 8px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📤 File Upload & Viewer</h1>
+        <h1>📤 Secure File Upload & Viewer</h1>
         
         <div class="upload-area" id="drop-area">
             <h3>Drop files here or click to upload</h3>
@@ -66,20 +67,18 @@
 
         <div id="status" class="status"></div>
         
-        <h2>Uploaded Files</h2>
+        <h2>📁 Uploaded Files</h2>
         <div id="files-list">Loading files...</div>
     </div>
 
     <script>
-        const GITHUB_TOKEN = "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";   // ← Replace with your token
-        const REPO_OWNER = "imotiv-j";
-        const REPO_NAME = "mcptest";
-        const BRANCH = "main";
+        const API_BASE = 'http://localhost:3000/api';
 
         // Upload File
         async function uploadFile(file) {
             const status = document.getElementById('status');
             status.textContent = `Uploading ${file.name}...`;
+            status.style.background = '#fff3cd';
 
             try {
                 const reader = new FileReader();
@@ -87,82 +86,62 @@
                     const content = btoa(unescape(encodeURIComponent(e.target.result)));
                     const path = `uploads/${Date.now()}-${file.name}`;
 
-                    const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Authorization': `token ${GITHUB_TOKEN}`,
-                            'Accept': 'application/vnd.github.v3+json',
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            message: `Upload ${file.name}`,
-                            content: content,
-                            branch: BRANCH
-                        })
+                    const res = await fetch(`${API_BASE}/upload`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ path, content, message: `Upload ${file.name}` })
                     });
 
                     if (res.ok) {
-                        status.innerHTML = `✅ Uploaded: <strong>${file.name}</strong>`;
-                        loadFiles(); // Refresh list
+                        status.innerHTML = `✅ Successfully uploaded: <strong>${file.name}</strong>`;
+                        status.style.background = '#d4edda';
+                        loadFiles();
                     } else {
-                        status.textContent = "❌ Upload failed (Check token & permissions)";
+                        status.textContent = '❌ Upload failed';
+                        status.style.background = '#f8d7da';
                     }
                 };
                 reader.readAsText(file);
             } catch (err) {
-                status.textContent = "❌ Error: " + err.message;
+                status.textContent = '❌ Error: ' + err.message;
             }
         }
 
-        // Load and display files in uploads/ folder
         async function loadFiles() {
             const listEl = document.getElementById('files-list');
-            listEl.innerHTML = "Loading files...";
+            listEl.innerHTML = 'Loading files...';
 
             try {
-                const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/uploads?ref=${BRANCH}`, {
-                    headers: {
-                        'Authorization': `token ${GITHUB_TOKEN}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-
-                if (res.status === 404) {
-                    listEl.innerHTML = "<p>No files uploaded yet.</p>";
-                    return;
-                }
-
+                const res = await fetch(`${API_BASE}/files`);
                 const files = await res.json();
                 
-                if (!Array.isArray(files)) {
-                    listEl.innerHTML = "<p>No files found in uploads/ folder.</p>";
+                if (!Array.isArray(files) || files.length === 0) {
+                    listEl.innerHTML = '<p>No files uploaded yet.</p>';
                     return;
                 }
 
                 let html = '';
                 files.forEach(file => {
                     if (file.type === 'file') {
-                        const rawUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${file.path}`;
+                        const rawUrl = `https://raw.githubusercontent.com/imotiv-j/mcptest/main/${file.path}`;
                         html += `
                             <div class="file-item">
                                 <span>📄 ${file.name}</span>
-                                <a href="${rawUrl}" target="_blank">View Raw</a>
+                                <a href="${rawUrl}" target="_blank" style="color: #667eea;">View Raw →</a>
                             </div>`;
                     }
                 });
-
-                listEl.innerHTML = html || "<p>No files yet.</p>";
+                listEl.innerHTML = html;
             } catch (err) {
-                listEl.innerHTML = "❌ Could not load files. Check token or repo.";
+                listEl.innerHTML = '<p style="color: red;">Cannot connect to backend server.<br>Make sure backend is running.</p>';
             }
         }
 
-        // Event Listeners
+        // Event listeners
         document.getElementById('fileInput').addEventListener('change', (e) => {
             if (e.target.files.length > 0) uploadFile(e.target.files[0]);
         });
 
-        // Drag & Drop
         const dropArea = document.getElementById('drop-area');
         dropArea.addEventListener('dragover', e => { e.preventDefault(); dropArea.style.background = '#f0f4ff'; });
         dropArea.addEventListener('dragleave', () => dropArea.style.background = '');
@@ -172,7 +151,6 @@
             if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
         });
 
-        // Auto load files when page opens
         window.onload = loadFiles;
     </script>
 </body>
