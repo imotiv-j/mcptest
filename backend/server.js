@@ -32,7 +32,7 @@ const BRANCH = 'main';
 
 // GitHub OAuth Login
 app.get('/auth/github', (req, res) => {
-  const redirectUri = `${req.protocol}://${req.get('host')}/auth/github/callback`;
+  const redirectUri = `https://congenial-waffle-5g4579j9wqxjh74gg-3000.app.github.dev/auth/github/callback`;
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user`;
   res.redirect(githubAuthUrl);
 });
