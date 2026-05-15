@@ -3,126 +3,497 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCP Test - Secure Upload</title>
+    <title>Vault — Secure File Upload</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
-        body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; background: #f8f9fa; }
-        .container { max-width: 900px; margin: 0 auto; background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-        h1 { text-align: center; }
-        .login-box, .upload-area { border: 3px dashed #667eea; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0; }
-        button { padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1.1rem; }
-        .file-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        #status { margin: 1rem 0; font-weight: bold; color: #333; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0a0a0f;
+            --surface: #12121a;
+            --surface-2: #1a1a26;
+            --border: rgba(255,255,255,0.07);
+            --border-hover: rgba(255,255,255,0.18);
+            --accent: #7c6aff;
+            --accent-glow: rgba(124, 106, 255, 0.35);
+            --accent-2: #ff6ac2;
+            --text: #f0f0f8;
+            --text-dim: rgba(240,240,248,0.45);
+            --text-muted: rgba(240,240,248,0.25);
+            --success: #4ade80;
+            --error: #f87171;
+            --radius: 14px;
+            --radius-sm: 8px;
+        }
+
+        html { height: 100%; }
+
+        body {
+            font-family: 'DM Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Background ── */
+        .bg-grid {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background-image:
+                linear-gradient(rgba(124,106,255,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(124,106,255,0.04) 1px, transparent 1px);
+            background-size: 48px 48px;
+        }
+        .bg-blob {
+            position: fixed; z-index: 0; pointer-events: none; border-radius: 50%;
+            filter: blur(120px); opacity: 0.18;
+        }
+        .bg-blob-1 { width: 600px; height: 600px; top: -200px; left: -150px; background: var(--accent); }
+        .bg-blob-2 { width: 400px; height: 400px; bottom: -100px; right: -100px; background: var(--accent-2); }
+
+        /* ── Layout ── */
+        .page { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
+
+        header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 20px 36px;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(10,10,15,0.7);
+        }
+
+        .logo {
+            font-family: 'Syne', sans-serif;
+            font-weight: 800;
+            font-size: 1.3rem;
+            letter-spacing: -0.02em;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .logo-icon {
+            width: 32px; height: 32px; border-radius: 8px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            display: grid; place-items: center; font-size: 16px;
+        }
+
+        #user-badge {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 0.8rem; color: var(--text-dim);
+        }
+        #user-badge .avatar {
+            width: 28px; height: 28px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            display: grid; place-items: center; font-size: 11px;
+            font-family: 'Syne', sans-serif; font-weight: 700; color: white;
+        }
+        #user-badge .username { color: var(--text); font-weight: 500; }
+
+        .btn-ghost {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--text-dim); padding: 7px 14px; border-radius: var(--radius-sm);
+            font-family: 'DM Mono', monospace; font-size: 0.75rem;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .btn-ghost:hover { border-color: var(--border-hover); color: var(--text); background: rgba(255,255,255,0.04); }
+
+        main {
+            flex: 1; padding: 48px 36px;
+            max-width: 820px; margin: 0 auto; width: 100%;
+        }
+
+        /* ── Login Screen ── */
+        #login-section {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; min-height: 70vh; text-align: center; gap: 24px;
+        }
+        .login-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 6px 14px; border-radius: 100px;
+            border: 1px solid rgba(124,106,255,0.3);
+            background: rgba(124,106,255,0.08);
+            font-size: 0.72rem; color: var(--accent);
+            font-family: 'DM Mono', monospace;
+            animation: fadeSlideIn 0.6s ease both;
+        }
+        .login-title {
+            font-family: 'Syne', sans-serif; font-size: clamp(2.4rem, 5vw, 3.8rem);
+            font-weight: 800; line-height: 1.05; letter-spacing: -0.03em;
+            animation: fadeSlideIn 0.6s 0.1s ease both;
+        }
+        .login-title span {
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .login-sub {
+            color: var(--text-dim); font-size: 0.9rem; max-width: 380px; line-height: 1.7;
+            animation: fadeSlideIn 0.6s 0.2s ease both;
+        }
+        .btn-primary {
+            display: inline-flex; align-items: center; gap: 10px;
+            padding: 14px 28px; border-radius: var(--radius-sm);
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            border: none; color: white; font-family: 'Syne', sans-serif;
+            font-weight: 600; font-size: 0.95rem; cursor: pointer;
+            transition: all 0.25s; box-shadow: 0 0 40px var(--accent-glow);
+            animation: fadeSlideIn 0.6s 0.3s ease both;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 60px var(--accent-glow); }
+        .btn-primary:active { transform: translateY(0); }
+
+        .login-features {
+            display: flex; gap: 24px; margin-top: 16px;
+            animation: fadeSlideIn 0.6s 0.4s ease both;
+        }
+        .login-feature {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 0.76rem; color: var(--text-muted);
+        }
+        .login-feature::before { content: '✓'; color: var(--success); }
+
+        /* ── App Section ── */
+        #main-app { display: none; animation: fadeSlideIn 0.5s ease both; }
+
+        .section-label {
+            font-size: 0.7rem; color: var(--text-muted); letter-spacing: 0.1em;
+            text-transform: uppercase; margin-bottom: 16px;
+        }
+
+        /* ── Drop Zone ── */
+        .drop-zone {
+            border: 1.5px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 56px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s;
+            background: rgba(255,255,255,0.01);
+            position: relative; overflow: hidden;
+            margin-bottom: 32px;
+        }
+        .drop-zone::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: radial-gradient(ellipse at 50% 50%, rgba(124,106,255,0.06) 0%, transparent 70%);
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--accent);
+            background: rgba(124,106,255,0.04);
+        }
+        .drop-zone:hover::before, .drop-zone.drag-over::before { opacity: 1; }
+        .drop-zone.drag-over { transform: scale(1.01); }
+
+        .drop-icon {
+            width: 52px; height: 52px; margin: 0 auto 16px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(124,106,255,0.15), rgba(255,106,194,0.1));
+            border: 1px solid rgba(124,106,255,0.2);
+            display: grid; place-items: center; font-size: 22px;
+            transition: transform 0.25s;
+        }
+        .drop-zone:hover .drop-icon { transform: translateY(-4px); }
+
+        .drop-title {
+            font-family: 'Syne', sans-serif; font-size: 1.05rem;
+            font-weight: 600; margin-bottom: 8px;
+        }
+        .drop-sub { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 20px; }
+
+        .btn-upload {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 22px; border-radius: var(--radius-sm);
+            background: rgba(124,106,255,0.12); border: 1px solid rgba(124,106,255,0.3);
+            color: var(--accent); font-family: 'DM Mono', monospace;
+            font-size: 0.82rem; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-upload:hover { background: rgba(124,106,255,0.2); border-color: var(--accent); }
+
+        /* ── Status ── */
+        #status {
+            display: none; align-items: center; gap: 10px;
+            padding: 12px 16px; border-radius: var(--radius-sm);
+            font-size: 0.8rem; margin-bottom: 24px;
+            border: 1px solid; animation: fadeSlideIn 0.3s ease;
+        }
+        #status.success { background: rgba(74,222,128,0.07); border-color: rgba(74,222,128,0.25); color: var(--success); }
+        #status.error { background: rgba(248,113,113,0.07); border-color: rgba(248,113,113,0.25); color: var(--error); }
+        #status.loading { background: rgba(124,106,255,0.07); border-color: rgba(124,106,255,0.25); color: var(--accent); }
+
+        /* ── Files List ── */
+        .files-header {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+        }
+        .files-title { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700; }
+
+        .btn-refresh {
+            display: flex; align-items: center; gap: 6px;
+            font-family: 'DM Mono', monospace; font-size: 0.74rem;
+            color: var(--text-muted); background: none; border: none; cursor: pointer;
+            transition: color 0.2s;
+        }
+        .btn-refresh:hover { color: var(--text); }
+        .btn-refresh svg { transition: transform 0.6s; }
+        .btn-refresh:hover svg { transform: rotate(180deg); }
+
+        #files-list { display: flex; flex-direction: column; gap: 8px; }
+
+        .file-card {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 18px; border-radius: var(--radius-sm);
+            background: var(--surface); border: 1px solid var(--border);
+            transition: all 0.2s; animation: fadeSlideIn 0.35s ease both;
+        }
+        .file-card:hover { border-color: var(--border-hover); background: var(--surface-2); }
+
+        .file-info { display: flex; align-items: center; gap: 12px; }
+        .file-icon {
+            width: 36px; height: 36px; border-radius: 8px;
+            background: rgba(124,106,255,0.08); border: 1px solid rgba(124,106,255,0.15);
+            display: grid; place-items: center; font-size: 14px; flex-shrink: 0;
+        }
+        .file-name { font-size: 0.85rem; color: var(--text); }
+        .file-meta { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+        .file-link {
+            font-size: 0.74rem; color: var(--accent); text-decoration: none;
+            display: flex; align-items: center; gap: 5px; opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        .file-link:hover { opacity: 1; }
+
+        .empty-state {
+            text-align: center; padding: 48px 24px;
+            color: var(--text-muted); font-size: 0.82rem; line-height: 1.8;
+        }
+        .empty-state .empty-icon { font-size: 2rem; margin-bottom: 12px; opacity: 0.4; }
+
+        /* ── Upload Progress ── */
+        .progress-bar {
+            height: 2px; border-radius: 2px;
+            background: rgba(124,106,255,0.15); margin-top: 12px; overflow: hidden;
+            display: none;
+        }
+        .progress-fill {
+            height: 100%; border-radius: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            width: 0%; transition: width 0.4s ease;
+        }
+
+        /* ── Spinner ── */
+        .spinner {
+            width: 14px; height: 14px; border: 2px solid rgba(124,106,255,0.3);
+            border-top-color: var(--accent); border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 600px) {
+            header { padding: 16px 20px; }
+            main { padding: 32px 20px; }
+            .login-features { flex-direction: column; align-items: center; gap: 12px; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>📤 Secure File Upload</h1>
-            <div id="user-info"></div>
+<div class="bg-grid"></div>
+<div class="bg-blob bg-blob-1"></div>
+<div class="bg-blob bg-blob-2"></div>
+
+<div class="page">
+    <header>
+        <div class="logo">
+            <div class="logo-icon">🔒</div>
+            Vault
+        </div>
+        <div id="user-badge" style="display:none"></div>
+    </header>
+
+    <main>
+        <!-- Login -->
+        <div id="login-section">
+            <div class="login-badge">⚡ Powered by GitHub OAuth</div>
+            <h1 class="login-title">Your files.<br><span>Secured.</span></h1>
+            <p class="login-sub">Upload and store files privately in your personal GitHub repository. Simple, fast, and yours.</p>
+            <button class="btn-primary" onclick="loginWithGitHub()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+                Continue with GitHub
+            </button>
+            <div class="login-features">
+                <div class="login-feature">OAuth secured</div>
+                <div class="login-feature">Private storage</div>
+                <div class="login-feature">Instant access</div>
+            </div>
         </div>
 
-        <div id="login-section" class="login-box">
-            <h2>Welcome</h2>
-            <button onclick="loginWithGitHub()">Sign in with GitHub</button>
-        </div>
+        <!-- App -->
+        <div id="main-app">
+            <div class="section-label">Upload</div>
 
-        <div id="main-app" style="display: none;">
-            <div class="upload-area" id="drop-area">
-                <h3>Drop file here or click to upload</h3>
+            <div class="drop-zone" id="drop-area">
+                <div class="drop-icon">📤</div>
+                <div class="drop-title">Drop your file here</div>
+                <div class="drop-sub">or browse from your device</div>
+                <button class="btn-upload" onclick="document.getElementById('fileInput').click()">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                    Select file
+                </button>
+                <div class="progress-bar" id="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
                 <input type="file" id="fileInput" hidden>
-                <button onclick="document.getElementById('fileInput').click()">Select File</button>
             </div>
 
-            <button onclick="loadFiles()">🔄 Refresh Files</button>
-            <button onclick="logout()">Logout</button>
             <div id="status"></div>
-            
-            <h2>Your Files</h2>
-            <div id="files-list">Loading your files...</div>
-        </div>
-    </div>
 
-    <script>
-        async function checkLogin() {
+            <div class="files-header">
+                <span class="files-title">Your files</span>
+                <button class="btn-refresh" onclick="loadFiles()">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                    Refresh
+                </button>
+            </div>
+
+            <div id="files-list">
+                <div class="empty-state">
+                    <div class="empty-icon">📂</div>
+                    Loading your files...
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    function getFileIcon(name) {
+        const ext = name.split('.').pop().toLowerCase();
+        const map = { pdf: '📄', jpg: '🖼', jpeg: '🖼', png: '🖼', gif: '🖼', mp4: '🎬', mov: '🎬', mp3: '🎵', zip: '📦', gz: '📦', txt: '📝', md: '📝', js: '⚙️', ts: '⚙️', py: '🐍', json: '📋', csv: '📊' };
+        return map[ext] || '📄';
+    }
+
+    function showStatus(msg, type = 'loading') {
+        const el = document.getElementById('status');
+        const icons = { loading: '<div class="spinner"></div>', success: '✓', error: '✕' };
+        el.className = type;
+        el.style.display = 'flex';
+        el.innerHTML = `${icons[type]} ${msg}`;
+        if (type !== 'loading') setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
+
+    async function checkLogin() {
+        try {
             const res = await fetch('/api/user');
             if (res.ok) {
                 const user = await res.json();
                 document.getElementById('login-section').style.display = 'none';
                 document.getElementById('main-app').style.display = 'block';
-                document.getElementById('user-info').innerHTML = `Logged in as <strong>@${user.login}</strong>`;
+
+                const initials = (user.name || user.login).slice(0, 2).toUpperCase();
+                document.getElementById('user-badge').style.display = 'flex';
+                document.getElementById('user-badge').innerHTML = `
+                    <div class="avatar">${initials}</div>
+                    <span class="username">@${user.login}</span>
+                    <button class="btn-ghost" onclick="logout()">Sign out</button>
+                `;
                 loadFiles();
             }
-        }
+        } catch(e) {}
+    }
 
-        function loginWithGitHub() {
-            window.location.href = '/auth/github';
-        }
+    function loginWithGitHub() { window.location.href = '/auth/github'; }
+    function logout() { window.location.href = '/api/logout'; }
 
-        function logout() {
-            window.location.href = '/api/logout';
-        }
+    async function uploadFile(file) {
+        const progressBar = document.getElementById('progress-bar');
+        const progressFill = document.getElementById('progress-fill');
+        progressBar.style.display = 'block';
+        progressFill.style.width = '0%';
+        showStatus(`Uploading ${file.name}…`, 'loading');
 
-        async function uploadFile(file) {
-            const status = document.getElementById('status');
-            status.textContent = `Uploading ${file.name}...`;
+        setTimeout(() => { progressFill.style.width = '40%'; }, 100);
 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const content = btoa(unescape(encodeURIComponent(e.target.result)));
-                const username = 'PLACEHOLDER'; // will be replaced by session
-                const path = `uploads/${username}/${Date.now()}-${file.name}`;
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const content = btoa(unescape(encodeURIComponent(e.target.result)));
+            const userRes = await fetch('/api/user');
+            const user = await userRes.json();
+            const path = `uploads/${user.login}/${Date.now()}-${file.name}`;
 
-                const res = await fetch('/api/upload', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path, content })
-                });
+            progressFill.style.width = '70%';
 
-                if (res.ok) {
-                    status.innerHTML = `✅ Uploaded: <strong>${file.name}</strong>`;
-                    loadFiles();
-                } else {
-                    status.textContent = '❌ Upload failed';
-                }
-            };
-            reader.readAsText(file);
-        }
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path, content })
+            });
 
-        async function loadFiles() {
-            const listEl = document.getElementById('files-list');
-            listEl.innerHTML = 'Loading...';
+            progressFill.style.width = '100%';
+            setTimeout(() => { progressBar.style.display = 'none'; progressFill.style.width = '0%'; }, 600);
 
-            try {
-                const res = await fetch('/api/files');
-                const files = await res.json();
-
-                let html = '';
-                files.forEach(file => {
-                    const rawUrl = `https://raw.githubusercontent.com/imotiv-j/mcptest/main/${file.path}`;
-                    html += `<div class="file-item"><span>📄 ${file.name}</span><a href="${rawUrl}" target="_blank">View</a></div>`;
-                });
-                listEl.innerHTML = html || '<p>No files yet.</p>';
-            } catch (err) {
-                listEl.innerHTML = 'Error loading files.';
+            if (res.ok) {
+                showStatus(`${file.name} uploaded successfully`, 'success');
+                loadFiles();
+            } else {
+                showStatus('Upload failed. Please try again.', 'error');
             }
+        };
+        reader.onerror = () => showStatus('Could not read file.', 'error');
+        reader.readAsText(file);
+    }
+
+    async function loadFiles() {
+        const listEl = document.getElementById('files-list');
+        listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div>Fetching your files…</div>`;
+        try {
+            const res = await fetch('/api/files');
+            const files = await res.json();
+
+            if (!Array.isArray(files) || files.length === 0) {
+                listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">📂</div>No files yet.<br>Upload something to get started.</div>`;
+                return;
+            }
+
+            listEl.innerHTML = '';
+            files.forEach((file, i) => {
+                const rawUrl = `https://raw.githubusercontent.com/imotiv-j/mcptest/main/${file.path}`;
+                const icon = getFileIcon(file.name);
+                const card = document.createElement('div');
+                card.className = 'file-card';
+                card.style.animationDelay = `${i * 0.05}s`;
+                card.innerHTML = `
+                    <div class="file-info">
+                        <div class="file-icon">${icon}</div>
+                        <div>
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-meta">${file.path}</div>
+                        </div>
+                    </div>
+                    <a class="file-link" href="${rawUrl}" target="_blank">
+                        View
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+                    </a>
+                `;
+                listEl.appendChild(card);
+            });
+        } catch(e) {
+            listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Error loading files.</div>`;
         }
+    }
 
-        // Drag & Drop
-        const dropArea = document.getElementById('drop-area');
-        dropArea.addEventListener('dragover', e => { e.preventDefault(); dropArea.style.background = '#f0f4ff'; });
-        dropArea.addEventListener('dragleave', () => dropArea.style.background = '');
-        dropArea.addEventListener('drop', e => {
-            e.preventDefault();
-            dropArea.style.background = '';
-            if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]);
-        });
+    // Drag & Drop
+    const dropArea = document.getElementById('drop-area');
+    ['dragenter','dragover'].forEach(ev => dropArea.addEventListener(ev, e => { e.preventDefault(); dropArea.classList.add('drag-over'); }));
+    ['dragleave','dragend','drop'].forEach(ev => dropArea.addEventListener(ev, e => { e.preventDefault(); dropArea.classList.remove('drag-over'); }));
+    dropArea.addEventListener('drop', e => { if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]); });
+    document.getElementById('fileInput').addEventListener('change', e => { if (e.target.files.length) uploadFile(e.target.files[0]); });
 
-        document.getElementById('fileInput').addEventListener('change', e => {
-            if (e.target.files.length) uploadFile(e.target.files[0]);
-        });
-
-        window.onload = checkLogin;
-    </script>
+    window.onload = checkLogin;
+</script>
 </body>
 </html>
