@@ -132,6 +132,43 @@ app.post('/api/upload', async (req, res) => {
   }
 });
 
+app.delete('/api/delete', async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { path, sha } = req.body;
+  const username = req.session.user.login;
+
+  // Safety check: only allow deleting from the user's own folder
+  if (!path.startsWith(`uploads/${username}/`)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: `Delete ${path} by ${username}`,
+        sha: sha,
+        branch: BRANCH
+      })
+    });
+
+    if (response.ok) {
+      res.json({ success: true });
+    } else {
+      const err = await response.json();
+      res.status(response.status).json({ error: err.message });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Serve frontend
 app.use(express.static(path.join(__dirname, '../frontend')));
 
