@@ -19,7 +19,10 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'fallback-secret-change-in-production',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false } // set to true in production with HTTPS
+  cookie: { 
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax'
+}
 }));
 
 // Config from .env
