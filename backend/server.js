@@ -174,5 +174,6 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log('🌐 Open the Codespaces forwarded URL for port 3000');
+  console.log('CLIENT_ID:', process.env.GITHUB_CLIENT_ID);
+console.log('APP_URL:', process.env.APP_URL);
 });
