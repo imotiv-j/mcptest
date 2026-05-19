@@ -32,7 +32,7 @@ const BRANCH = 'main';
 
 // GitHub OAuth Login
 app.get('/auth/github', (req, res) => {
-  const redirectUri = `mcptest-production-ee5e.up.railway.app/auth/github/callback`;
+  const redirectUri = `${process.env.APP_URL}/auth/github/callback`;
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user`;
   res.redirect(githubAuthUrl);
 });
