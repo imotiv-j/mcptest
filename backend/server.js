@@ -34,10 +34,37 @@ const REPO_NAME = 'mcptest';
 const BRANCH = 'main';
 
 // GitHub OAuth Login
-app.get('/auth/github', (req, res) => {
-  const redirectUri = `${process.env.APP_URL}/auth/github/callback`;
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user`;
-  res.redirect(githubAuthUrl);
+app.get('/auth/github/callback', async (req, res) => {
+  const code = req.query.code;
+  if (!code) return res.status(400).send('No code provided');
+
+  try {
+    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: GITHUB_CLIENT_ID,
+        client_secret: GITHUB_CLIENT_SECRET,
+        code: code
+      })
+    });
+
+    const tokenData = await tokenResponse.json();
+    const accessToken = tokenData.access_token;
+
+    const userResponse = await fetch('https://api.github.com/user', {
+      headers: { 'Authorization': `token ${accessToken}` }
+    });
+    const user = await userResponse.json();
+
+    req.session.user = user;
+    req.session.save((err) => {          // ← explicitly save before redirecting
+      if (err) return res.status(500).send('Session save failed');
+      res.redirect('/');
+    });
+  } catch (error) {
+    res.status(500).send('Authentication failed');
+  }
 });
 
 app.get('/auth/github/callback', async (req, res) => {
