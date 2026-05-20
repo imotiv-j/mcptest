@@ -19,10 +19,10 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'fallback-secret-change-in-production',
   resave: false,
   saveUninitialized: false,
-  cookie: { 
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax'
-}
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  }
 }));
 
 // Config from .env
@@ -34,37 +34,10 @@ const REPO_NAME = 'mcptest';
 const BRANCH = 'main';
 
 // GitHub OAuth Login
-app.get('/auth/github/callback', async (req, res) => {
-  const code = req.query.code;
-  if (!code) return res.status(400).send('No code provided');
-
-  try {
-    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
-      method: 'POST',
-      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: GITHUB_CLIENT_ID,
-        client_secret: GITHUB_CLIENT_SECRET,
-        code: code
-      })
-    });
-
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
-
-    const userResponse = await fetch('https://api.github.com/user', {
-      headers: { 'Authorization': `token ${accessToken}` }
-    });
-    const user = await userResponse.json();
-
-    req.session.user = user;
-    req.session.save((err) => {          // ← explicitly save before redirecting
-      if (err) return res.status(500).send('Session save failed');
-      res.redirect('/');
-    });
-  } catch (error) {
-    res.status(500).send('Authentication failed');
-  }
+app.get('/auth/github', (req, res) => {
+  const redirectUri = `${process.env.APP_URL}/auth/github/callback`;
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user`;
+  res.redirect(githubAuthUrl);
 });
 
 app.get('/auth/github/callback', async (req, res) => {
@@ -91,7 +64,10 @@ app.get('/auth/github/callback', async (req, res) => {
     const user = await userResponse.json();
 
     req.session.user = user;
-    res.redirect('/');
+    req.session.save((err) => {
+      if (err) return res.status(500).send('Session save failed');
+      res.redirect('/');
+    });
   } catch (error) {
     res.status(500).send('Authentication failed');
   }
@@ -168,7 +144,6 @@ app.delete('/api/delete', async (req, res) => {
   const { path, sha } = req.body;
   const username = req.session.user.login;
 
-  // Safety check: only allow deleting from the user's own folder
   if (!path.startsWith(`uploads/${username}/`)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
@@ -205,5 +180,5 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log('CLIENT_ID:', process.env.GITHUB_CLIENT_ID);
-console.log('APP_URL:', process.env.APP_URL);
+  console.log('APP_URL:', process.env.APP_URL);
 });
